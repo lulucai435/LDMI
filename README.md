@@ -101,12 +101,11 @@ To run experiments involving 3D model rendering, make sure to install both [`mcu
 ## BibTeX
 
 ```
-@article{peis2025hyper,
+@InProceedings{peis2025hyper,
   title={Hyper-Transforming Latent Diffusion Models},
   author={Peis, Ignacio and Koyuncu, Batuhan and Valera, Isabel and Frellsen, Jes},
-  journal={arXiv preprint arXiv:2504.16580},
+  booktitle={Proceedings of the 42nd International Conference on Machine Learning},
+  publisher={PMLR},
   year={2025}
 }
 ```
-
-
