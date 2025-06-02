@@ -1,0 +1,102 @@
+model:
+  base_learning_rate: 1e-6
+  target:  ldm.models.autoencoder.IVAE
+  params:
+    monitor: "val/rec_loss"
+    embed_dim: 3
+    lossconfig:
+      target: ldm.modules.losses.LPIPSWithDiscriminator
+      params:
+        disc_start: 1.0e+4      # Start training discriminator after 10k steps
+        kl_weight: 1.0e-05
+        disc_weight: 0.75
+        disc_num_layers: 2
+        disc_ndf: 32
+        disc_dropout: 0.2
+
+    encoder:
+      target: ldm.modules.diffusionmodules.model.Encoder
+      params:
+        double_z: True
+        z_channels: 3
+        resolution: 64
+        in_channels: 3
+        out_ch: 3
+        ch: 64
+        ch_mult: [ 1,2,4 ]  # num_down = len(ch_mult)-1
+        num_res_blocks: 2
+        attn_resolutions: [ ]
+        dropout: 0.0
+
+    decoder:
+      target: ldm.modules.decoders.hyper_mlp.HyperMLP
+      params:
+        data_shape: [64, 64]
+        update_strategy: scale
+        tokenizer:
+          target: None
+          params:                 # z is (latent_dim, latent_size, latent_size)
+            latent_dim: 3         # 3-channel latent tensor
+            latent_size: 16       # 16 sized latent tensor  
+            patch_size: 2         # Produces 64 tokens (8x8 grid)
+            n_head: 4             # 4 attention heads for better feature mixing
+            head_dim: 32          # 32 per-head embedding size
+
+        inr:
+          target: ldm.modules.decoders.inrs.inr_mlp.InrMlp
+          params:
+            in_dim: 2
+            out_dim: 3 
+            out_bias: 0.5
+            depth: 5 
+            hidden_dim: 256
+            use_pe: true
+            pe_dim: 128
+
+        n_groups: 64  # Using the same as original
+        mlp:
+          target: ldm.modules.decoders.mlp.MLP
+          params:
+            hidden_dims: [128, 256, 512]
+            dropout: 0.1  # Same as original
+            activation: 'gelu'
+
+
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 64
+    num_workers: 8
+    wrap: false
+    train:
+      target: ldm.data.celebahq.CelebAHQ
+      params:
+        size: 64
+        data_root: '/work3/ipeaz/data/celebahq/train/'
+        #data_root: '{$LOGDIR}data/celebahq/train/'
+
+    validation:
+      target:  ldm.data.celebahq.CelebAHQ
+      params:
+        size: 64
+        data_root: '/work3/ipeaz/data/celebahq/val/'
+        #data_root: '{$LOGDIR}data/celebahq/val/'
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ImageLogger
+      params:
+        batch_frequency: 10000
+        max_images: 12    # sqrt(max_images) sized grid
+        cols: 6
+        increase_log_steps: False
+        clamp: True
+        log_first_step: False
+
+  trainer:
+    max_epochs: -1  # Infinite epochs
+    benchmark: True
+    accumulate_grad_batches: 2
+

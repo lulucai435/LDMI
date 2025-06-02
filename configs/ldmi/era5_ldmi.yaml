@@ -1,0 +1,138 @@
+model:
+  base_learning_rate: 2.0e-06
+  target: ldm.models.diffusion.ddpm.LatentDiffusion
+  params:
+    linear_start: 0.0015
+    linear_end: 0.0195
+    num_timesteps_cond: 1
+    log_every_t: 200
+    timesteps: 1000
+    first_stage_key: image
+    image_size: [11,22]
+    channels: 3
+    monitor: val/loss_simple_ema
+
+    unet_config:
+      target: ldm.modules.diffusionmodules.openaimodel.UNetModel
+      params:
+        image_size: 22
+        in_channels: 3
+        out_channels: 3
+        model_channels: 64
+        attention_resolutions:
+        # note: this isn\t actually the resolution but
+        # the downsampling factor, i.e. this corresnponds to
+        # attention on spatial resolution 8,16,32, as the
+        # spatial reolution of the latents is 64 for f4
+        - 8
+        - 4
+        - 2
+        num_res_blocks: 2
+        channel_mult:
+        - 1
+        - 2
+        - 3
+        - 4
+        num_head_channels: 32
+    first_stage_config:
+      target: ldm.models.autoencoder.IVAE
+      params:
+        monitor: "val/rec_loss"
+        ckpt_path: /dtu/p1/ipeaz/logs/LDMI/2025-01-30T01-14-00_era5_ivae/checkpoints/last.ckpt
+        lossconfig:
+          target:  ldm.modules.losses.occupancy_loss.BernoulliLoss
+          params:
+            kl_weight: 1.0e-6
+        embed_dim: 3
+        encoder:
+          target: ldm.modules.diffusionmodules.model.Encoder
+          params:
+            double_z: True
+            z_channels: 3
+            resolution: 64
+            in_channels: 1
+            out_ch: 3
+            ch: 32
+            ch_mult: [ 1,2,4 ]  # num_down = len(ch_mult)-1
+            num_res_blocks: 2
+            attn_resolutions: [ ]
+            dropout: 0.0
+
+        data_converter:
+          target:  ldm.data.data_converters.conversion.ERA5Converter
+          params:
+            data_shape: [46,90]
+            normalize_features: False
+
+        decoder:
+          target: ldm.modules.decoders.trans_inr.TransInr
+          params:
+            data_shape: [64,64]
+            tokenizer:
+              target: ldm.modules.decoders.tokenizers.latent_tokenizer.LatentTokenizer
+              params:                 # z is (latent_dim, latent_size, latent_size)
+                latent_dim: 3         # latent depth is doubled in post_quant_conv
+                latent_size: [11,22]    # 16 sized latent tensor  
+                patch_size: 1         # Produces 64 tokens (8x8 grid)
+                n_head: 4             # 4 attention heads for better feature mixing
+                head_dim: 32          # 32 per-head embedding size
+
+            inr:
+              target: ldm.modules.decoders.inrs.inr_mlp.InrMlp
+              params:
+                in_dim: 3
+                out_dim: 1
+                out_bias: 0.5
+                depth: 5 
+                hidden_dim: 256
+                use_pe: true
+                pe_dim: 256
+                
+            n_groups: 64   # in Trans-INR CelebA: 64
+            transformer:
+              target: ldm.modules.decoders.transformer.Transformer
+              params:
+                dim: 136  # Reduced from 192
+                encoder_depth: 4  # Reduced from 6
+                decoder_depth: 4  # Reduced from 6
+                n_head: 4  # Adjusted to balance dim
+                head_dim: 32  # Keeping same head dim
+                ff_dim: 512  # Reduced from 768
+    cond_stage_config: __is_unconditional__
+
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 64
+    num_workers: 8
+    wrap: false
+    train:
+      target: ldm.data.era.ERA5Dataset
+      params:
+        path_to_data: /work3/ipeaz/data/era5/era5_temp2m_16x_train
+    validation:
+      target: ldm.data.era.ERA5Dataset
+      params:
+        path_to_data: /work3/ipeaz/data/era5/era5_temp2m_16x_val
+    test:
+      target: ldm.data.era.ERA5Dataset
+      params:
+        path_to_data: /work3/ipeaz/data/era5/era5_temp2m_16x_test
+
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.ERA5Logger
+      params:
+        disabled: True
+        batch_frequency: 1000
+        max_images: 4
+        cols: 1
+        increase_log_steps: True
+        log_first_step: True
+
+  trainer:
+    max_epochs: -1
+    benchmark: True

@@ -1,0 +1,7 @@
+
+target: experiments.celeba_images.CelebAImages
+params:
+  max_images: 16
+  
+
+

@@ -1,0 +1,9 @@
+
+target: experiments.render_chairs.RenderChairs
+params:
+  voxels_path: /zhome/d8/1/207127/LDMI_pre/experiments/assets/vamoh__voxels__recons.npy
+  max_images: 6
+  cols: 6
+  
+
+

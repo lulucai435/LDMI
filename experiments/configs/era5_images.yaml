@@ -1,0 +1,8 @@
+
+target: experiments.era5_images.ERA5Images
+params:
+  max_images: 4
+  cols: 4
+  
+
+

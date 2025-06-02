@@ -1,0 +1,11 @@
+
+target: experiments.multiple_resolutions.MultipleResolutions
+params:
+  max_images: 8
+  resolutions: [0.125, 0.25, 0.5, 1, 2, 4]
+  patch_size: 16
+  orig_cx: 32
+  orig_cy: 44
+  
+
+

@@ -1,0 +1,8 @@
+*.pyc
+*.out
+*.DS_Store
+#*.png
+src/
+taming/
+*__py
+*__pycache__/

@@ -1,0 +1,5 @@
+
+target: experiments.multiple_resolutions_chairs.MultipleResolutionsChairs
+params:
+  max_images: 4
+  resolutions: [0.125, 0.25, 0.5, 1, 2, 4]

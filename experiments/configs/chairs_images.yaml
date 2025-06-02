@@ -1,0 +1,8 @@
+
+target: experiments.chairs_images.ChairsImages
+params:
+  max_images: 6
+  cols: 6
+  
+
+

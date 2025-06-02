@@ -1,0 +1,6 @@
+
+target: experiments.image_metrics.ImageMetrics
+params:
+  save_name: celeba
+  
+

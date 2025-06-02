@@ -1,0 +1,8 @@
+
+target: experiments.voxel_logger_experiment.VoxelLoggerExperiment
+params:
+  max_images: 16
+  cols: 4
+  
+
+

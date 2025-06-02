@@ -1,0 +1,8 @@
+
+target: experiments.image_logger_experiment.ImageLoggerExperiment
+params:
+  max_images: 16
+  cols: 4
+  
+
+

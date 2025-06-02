@@ -1,0 +1,94 @@
+model:
+  base_learning_rate: 1.0e-6
+  target:  ldm.models.autoencoder.IPVAE
+  params:
+    monitor: "val/rec_loss"
+    lossconfig:
+      target:  ldm.modules.losses.occupancy_loss.BernoulliLoss
+      params:
+        kl_weight: 1.0e-6
+
+    encoder:
+      target: ldm.modules.encoders.conv3d_encoder.Conv3DEncoder
+      params:
+        dim_z: 64
+        base_channels: 32
+        dropout: 0.2
+
+    data_converter:
+      target:  ldm.data.data_converters.conversion.GridDataConverter
+      params:
+        data_shape: [1,32,32,32]
+        normalize_features: True
+
+    decoder:
+      target: ldm.modules.decoders.trans_inr.TransInr
+      params:
+        data_shape: [32,32,32]
+        update_strategy: scale
+        tokenizer:
+          target: ldm.modules.decoders.tokenizers.latent_tokenizer.LatentTokenizer
+          params:                 # z is (latent_dim, latent_size, latent_size)
+            latent_dim: 64        # latent depth is doubled in post_quant_conv
+            latent_size: [4,4]    # 16 sized latent tensor  
+            patch_size: 1         # Produces 64 tokens (8x8 grid)
+            n_head: 4             # 4 attention heads for better feature mixing
+            head_dim: 32          # 32 per-head embedding size
+
+        inr:
+          target: ldm.modules.decoders.inrs.siren.SIREN
+          params:
+            in_dim: 3
+            out_dim: 1 
+            out_bias: 0.5
+            depth: 5 
+            hidden_dim: 256
+          
+        n_groups: 64   # in Trans-INR CelebA: 64
+        transformer:
+          target: ldm.modules.decoders.transformer.Transformer
+          params:
+            dim: 128
+            encoder_depth: 3
+            decoder_depth: 3
+            n_head: 4
+            head_dim: 32
+            ff_dim: 512
+            dropout: 0.2
+
+
+data:
+  target: main.DataModuleFromConfig
+  params:
+    batch_size: 64
+    num_workers: 8
+    wrap: false
+    train:
+      target: ldm.data.pointcloud.VoxelTrain
+      params:
+        data_root: /work3/ipeaz/data/
+    validation:
+      target:  ldm.data.pointcloud.VoxelVal
+      params:
+        data_root: /work3/ipeaz/data/
+    test:
+      target:  ldm.data.pointcloud.VoxelTest
+      params:
+        data_root: /work3/ipeaz/data/
+
+lightning:
+  callbacks:
+    image_logger:
+      target: main.VoxelLogger
+      params:
+        batch_frequency: 1000
+        max_images: 16
+        cols: 4
+        increase_log_steps: False
+        clamp: True
+        log_first_step: True
+
+  trainer:
+    max_epochs: -1
+    benchmark: True
+    gradient_clip_val: 0.5
