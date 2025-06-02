@@ -1,5 +1,5 @@
 # Hyper-Transforming Latent Diffusion Models
-[arXiv](https://arxiv.org/abs/2112.10752) | [BibTeX](#bibtex)
+[arXiv](https://arxiv.org/abs/2504.16580) | [BibTeX](#bibtex)
 ---
 
 
