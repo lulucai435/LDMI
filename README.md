@@ -86,10 +86,6 @@ Experiments can by easily run by calling adding scripts to the `experiments` fol
 python run_experiment.py --experiment experiments/configs/log_images.yaml --model_cfg configs/ldmi/celebahq256_ldmi.yaml --ckpt <my_checkpoint>.ckpt
 ``` 
 
-## Comments 
-
-- This project is largely based on the [latent-diffusion codebase](https://github.com/CompVis/latent-diffusion). We’re grateful to all its contributors for making it open source!
-
 ## Globe plots
 
 By default, climate data samples are displayed using flat map projections. To render these samples on a globe, you can make use of the functions provided in `utils/viz/plots_globe.py`. This functionality depends on the [`cartopy`](https://scitools.org.uk/cartopy/docs/latest/) library, which must be installed separately. For setup instructions, refer to the [official installation guide](https://scitools.org.uk/cartopy/docs/latest/installing.html).
@@ -97,6 +93,12 @@ By default, climate data samples are displayed using flat map projections. To re
 ## Visualizing 3D Samples
 
 To run experiments involving 3D model rendering, make sure to install both [`mcubes`](https://github.com/pmneila/PyMCubes) (for marching cubes extraction) and [`pytorch3d`](https://github.com/facebookresearch/pytorch3d). Note that installing PyTorch3D may require extra steps depending on your PyTorch version—it’s not always available via `pip`. Refer to their [installation guide](https://github.com/facebookresearch/pytorch3d/blob/master/INSTALL.md) for detailed instructions.
+
+
+## Comments 
+
+- This project is largely based on the [latent-diffusion codebase](https://github.com/CompVis/latent-diffusion). We also drew inspiration from [Trans-INR](https://github.com/yinboc/trans-inr) code. We’re grateful to all its contributors for making it open source!
+
 
 ## BibTeX
 
