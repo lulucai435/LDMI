@@ -13,6 +13,8 @@ from ldm.util import instantiate_from_config
 
 from utils.geometry import make_coord_grid
 from packaging import version
+import time
+from pdb import set_trace as bb
 
 class VQModel(pl.LightningModule):
     def __init__(self,
@@ -70,6 +72,7 @@ class VQModel(pl.LightningModule):
 
     @contextmanager
     def ema_scope(self, context=None):
+        #bb()
         if self.use_ema:
             self.model_ema.store(self.parameters())
             self.model_ema.copy_to(self)
@@ -83,26 +86,50 @@ class VQModel(pl.LightningModule):
                 if context is not None:
                     print(f"{context}: Restored training weights")
 
-    def init_from_ckpt(self, path, ignore_keys=list()):
+    def init_from_ckpt(self, path, ignore_keys=[]):
         sd = torch.load(path, map_location="cpu")["state_dict"]
-        keys = list(sd.keys())
-        for k in keys:
-            for ik in ignore_keys:
-                if k.startswith(ik):
-                    print("Deleting key {} from state_dict.".format(k))
-                    del sd[k]
-        missing, unexpected = self.load_state_dict(sd, strict=False)
-        print(f"Restored from {path} with {len(missing)} missing and {len(unexpected)} unexpected keys")
-        if len(missing) > 0:
-            print(f"Missing Keys: {missing}")
-            print(f"Unexpected Keys: {unexpected}")
+        new_sd = {}
+        loaded_keys = []  # 成功加载的 key
+
+        for k, v in sd.items():
+            if any(k.startswith(ik) for ik in ignore_keys):
+                print(f"Ignoring key: {k}")
+                continue
+
+            # 去掉 first_stage_model. 前缀
+            new_key = k.replace("first_stage_model.", "") if k.startswith("first_stage_model.") else k
+            new_sd[new_key] = v
+
+        # 加载参数（不严格匹配）
+        missing, unexpected = self.load_state_dict(new_sd, strict=False)
+
+        # 记录成功加载的 key
+        model_keys = set(self.state_dict().keys())
+        loaded_keys = [k for k in new_sd.keys() if k in model_keys]
+
+        print(f"Successfully loaded {len(loaded_keys)} keys:")
+        for k in loaded_keys:
+            print(f"  {k}")
+        # bb()
+        print(f"\nRestored from {path}")
+        # print(f"Missing Keys: {len(missing)}")
+        # if missing:
+        #     for k in missing:
+        #         print(f"  [Missing] {k}")
+        # print(f"Unexpected Keys: {len(unexpected)}")
+        # if unexpected:
+        #     for k in unexpected:
+        #         print(f"  [Unexpected] {k}")
+
 
     def on_train_batch_end(self, *args, **kwargs):
         if self.use_ema:
             self.model_ema(self)
 
     def encode(self, x, quantize=False):
+        # bb()
         h = self.encoder(x)
+        # bb()
         h = self.quant_conv(h)
         if quantize:
             quant, emb_loss, info = self.quantize(h)
@@ -127,6 +154,7 @@ class VQModel(pl.LightningModule):
 
     def forward(self, input, return_pred_indices=False):
         quant, diff, (_,_,ind) = self.encode(input, quantize=True)
+        # bb()
         dec = self.decode(quant)
         if return_pred_indices:
             return dec, diff, ind
@@ -151,6 +179,7 @@ class VQModel(pl.LightningModule):
         # https://github.com/pytorch/pytorch/issues/37142
         # try not to fool the heuristics
         x = self.get_input(batch, self.image_key)
+        # bb()
         xrec, qloss, ind = self(x, return_pred_indices=True)
 
         if optimizer_idx == 0:
@@ -158,7 +187,7 @@ class VQModel(pl.LightningModule):
             aeloss, log_dict_ae = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                             last_layer=self.get_last_layer(), split="train",
                                             predicted_indices=ind)
-
+            # log_dict_ae = {k: v for k, v in log_dict_ae.items() if 'rec_loss' in k}
             self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
             return aeloss
 
@@ -166,8 +195,10 @@ class VQModel(pl.LightningModule):
             # discriminator
             discloss, log_dict_disc = self.loss(qloss, x, xrec, optimizer_idx, self.global_step,
                                             last_layer=self.get_last_layer(), split="train")
-            self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
-            return discloss
+            # self.log_dict(log_dict_disc, prog_bar=False, logger=True, on_step=True, on_epoch=True, sync_dist=True)
+            # return discloss
+            self.log("train/disc_loss", torch.tensor(0.0, device=x.device), on_step=True, on_epoch=True)
+            return torch.tensor(0.0, device=x.device, requires_grad=True)
 
     def validation_step(self, batch, batch_idx):
         log_dict = self._validation_step(batch, batch_idx)
@@ -208,7 +239,9 @@ class VQModel(pl.LightningModule):
         lr_g = self.lr_g_factor*self.learning_rate
         print("lr_d", lr_d)
         print("lr_g", lr_g)
-        opt_ae = torch.optim.Adam(list(self.encoder.parameters())+
+        for param in self.encoder.parameters():
+            param.requires_grad = False
+        opt_ae = torch.optim.Adam(
                                   list(self.decoder.parameters())+
                                   list(self.quantize.parameters())+
                                   list(self.quant_conv.parameters())+
@@ -339,6 +372,7 @@ class VAE(pl.LightningModule):
         print(f"Restored from {path}")
 
     def encode(self, x):
+        # bb()
         h = self.encoder(x)
         moments = self.quant_conv(h)
         posterior = DiagonalGaussianDistribution(moments)
@@ -346,6 +380,7 @@ class VAE(pl.LightningModule):
 
     def decode(self, z, *args, **kwargs):
         z = self.post_quant_conv(z)
+        # bb()
         dec = self.decoder(z, *args, **kwargs)
         return dec
 
@@ -357,6 +392,7 @@ class VAE(pl.LightningModule):
             z = posterior.mode()
         
         dec = self.decode(z)
+        # bb()
         return dec, posterior
 
     def get_input(self, batch, k):
@@ -376,20 +412,20 @@ class VAE(pl.LightningModule):
 
     def training_step(self, batch, batch_idx, optimizer_idx=0):
         data = self.get_input(batch, self.image_key)
-
+        # bb()
         if hasattr(self, 'data_converter'):
             inputs = self.apply_data_converter(data)
             if hasattr(self.data_converter, "batch_to_coordinates_and_features"):
                 data = inputs
         else:
             inputs = data
-        
+        # bb()
         """if self.mask_input:
             bs, f, *dims = inputs.shape
             mask = (torch.rand(bs,1,*dims, device=inputs.device)) > torch.rand(1, device=inputs.device) * 0.99
         """
         reconstructions, posterior = self(inputs)
-
+        # bb()
         if optimizer_idx == 0:
             # train encoder+decoder+logvar
             aeloss, log_dict_ae = self.loss(data, reconstructions, posterior, 
@@ -534,6 +570,7 @@ class IPVAE(pl.LightningModule):
 
 
     def forward(self, input, sample_posterior=True):
+        # start_time = time.time()
         coord = input[0]
         posterior = self.encode(input)
         if sample_posterior:
@@ -542,7 +579,7 @@ class IPVAE(pl.LightningModule):
             z = posterior.mode()
         
         dec = self.decode(z, coord=coord)
-
+        # print(f"Forward time: {time.time() - start_time:.6f}s")
         return dec, posterior
 
     def encode(self, x):
@@ -691,7 +728,7 @@ class IVAE(VAE):
         
         # Change decoder to INR generator
         self.decoder = instantiate_from_config(decoder)
-
+        # bb()
         if data_converter != None:
             self.data_converter = instantiate_from_config(data_converter)
             if hasattr(self.data_converter, 'coordinates'):
