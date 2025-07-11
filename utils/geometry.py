@@ -5,23 +5,29 @@ import einops
 
 def make_coord_grid(shape, range, device=None):
     """
-        Args:
-            shape: tuple
-            range: [minv, maxv] or [[minv_1, maxv_1], ..., [minv_d, maxv_d]] for each dim
-        Returns:
-            grid: shape (*shape, )
+    Creates a coordinate grid matching SIREN's expectations.
+
+    Args:
+        shape: tuple of dimensions (e.g., (H, W) for 2D or (H, W, D) for 3D)
+        range: [minv, maxv] or [[minv_1, maxv_1], ..., [minv_d, maxv_d]] for each dim
+        device: torch device to create tensors on
+    Returns:
+        grid: tensor of shape (*shape, len(shape)) containing coordinates
     """
     l_lst = []
     for i, s in enumerate(shape):
-        l = (0.5 + torch.arange(s, device=device)) / s
-        if isinstance(range[0], list) or isinstance(range[0], tuple):
+        # Get range for this dimension
+        if isinstance(range[0], (list, tuple)):
             minv, maxv = range[i]
         else:
             minv, maxv = range
-        l = minv + (maxv - minv) * l
+
+        # Create linear spacing directly (no 0.5 offset)
+        l = torch.linspace(minv, maxv, s, device=device)
         l_lst.append(l)
-    #grid = torch.meshgrid(*l_lst, indexing='ij')
-    grid = torch.meshgrid(*l_lst)
+
+    # Use explicit 'ij' indexing for consistency across PyTorch versions
+    grid = torch.meshgrid(*l_lst, indexing="ij")
     grid = torch.stack(grid, dim=-1)
     return grid
 

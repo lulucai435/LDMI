@@ -10,10 +10,10 @@ from PIL import Image
 from tqdm import tqdm
 from torch.utils.data import Dataset, Subset
 
-# To avoid error importing the next line: 
+# To avoid error importing the next line:
 # In taming.data.utils, introduce this modification:
-#import collections.abc
-#string_classes = (str, bytes)
+# import collections.abc
+# string_classes = (str, bytes)
 import taming.data.utils as tdu
 from taming.data.imagenet import str_to_indices, give_synsets_from_indices, download, retrieve
 from taming.data.imagenet import ImagePaths
@@ -41,10 +41,12 @@ class ImageNetBase(Dataset):
         self._load()
 
     def __len__(self):
-        return len(self.data)
+        return len(self.data) * 1000000  # Repeat dataset 10000 times
 
     def __getitem__(self, i):
-        return self.data[i]
+        # Map the expanded index back to original dataset index
+        original_idx = i % len(self.data)
+        return self.data[0]
 
     def _prepare(self):
         raise NotImplementedError()
@@ -54,6 +56,7 @@ class ImageNetBase(Dataset):
             "n06596364_9591.JPEG",
         ])
         relpaths = [rpath for rpath in relpaths if not rpath.split("/")[-1] in ignore]
+        relpaths = [p for p in relpaths if "n01440764_438" in p]
         if "sub_indices" in self.config:
             indices = str_to_indices(self.config["sub_indices"])
             synsets = give_synsets_from_indices(indices, path_to_yaml=self.idx2syn)  # returns a list of strings
@@ -228,7 +231,7 @@ class ImageNetValidation(ImageNetBase):
         self.expected_length = 50000
         self.random_crop = retrieve(self.config, "ImageNetValidation/random_crop",
                                     default=False)
-        
+
         if not tdu.is_prepared(self.root):
             # prep
             print("Preparing dataset {} in {}".format(self.NAME, self.root))
@@ -262,7 +265,6 @@ class ImageNetValidation(ImageNetBase):
                     src = os.path.join(datadir, k)
                     dst = os.path.join(datadir, v)
                     shutil.move(src, dst)
-    
 
         filelist = glob.glob(os.path.join(self.datadir, "**", "*.JPEG"))
         filelist = [os.path.relpath(p, start=self.datadir) for p in filelist]
@@ -272,7 +274,6 @@ class ImageNetValidation(ImageNetBase):
             f.write(filelist)
 
         tdu.mark_prepared(self.root)
-
 
 
 class ImageNetSR(Dataset):

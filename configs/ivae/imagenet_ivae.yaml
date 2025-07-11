@@ -1,9 +1,9 @@
 model:
-  base_learning_rate: 1.0e-5
-  target: ldm.models.autoencoder.IVQModel
+  base_learning_rate: 1.0e-4
+  target: ldm.models.autoencoder.VQModel
   params:
-    ckpt_path: 'model.ckpt.1'    # https://ommer-lab.com/files/latent-diffusion/nitro/cin/
-    monitor: "val/rec_loss"
+    ckpt_path: 'ckpt/model.ckpt'    # https://ommer-lab.com/files/latent-diffusion/nitro/cin/
+    monitor: "train/rec_loss"
     embed_dim: 3
     n_embed: 8192
     lossconfig:
@@ -70,17 +70,17 @@ model:
 data:
   target: main.DataModuleFromConfig
   params:
-    batch_size: 32
+    batch_size: 1
     num_workers: 8
     wrap: false
     train:
       target: ldm.data.imagenet.ImageNetTrain
       params:
-        data_root: '/public/home/group_yangych/lulucai/data/imagenet/imagenet100'
+        data_root: './data/imagenet100'
     validation:
       target:  ldm.data.imagenet.ImageNetValidation
       params:
-        data_root: '/public/home/group_yangych/lulucai/data/imagenet/imagenet100'
+        data_root: './data/imagenet100'
 
 
 lightning:
@@ -95,4 +95,5 @@ lightning:
 
   trainer:
     max_epochs: -1  # Infinite epochs
-    benchmark: True
+    benchmark: False
+    ddp_find_unused_parameters: False
