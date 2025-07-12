@@ -84,7 +84,7 @@ class VoxelDataset(Dataset):
         Returns: voxels (32,32,32), label (0 for all samples)
         
         """
-        voxels = torch.load(self.voxel_paths[self.start_index + index])
+        voxels = torch.load(self.voxel_paths[self.start_index + index], weights_only=True)
         voxels = voxels.unsqueeze(0).float()
         
         if self.size != 32:

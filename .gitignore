@@ -6,3 +6,6 @@ src/
 taming/
 *__py
 *__pycache__/
+outputs/
+*.s
+*results/

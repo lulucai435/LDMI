@@ -415,6 +415,8 @@ class VAE(pl.LightningModule):
 
         if hasattr(self, 'data_converter'):
             inputs = self.apply_data_converter(data)
+            if hasattr(self.data_converter, "batch_to_coordinates_and_features"):
+                data = inputs
         else:
             inputs = data
 
@@ -490,27 +492,16 @@ class IPVAE(pl.LightningModule):
                  ckpt_path=None,
                  ignore_keys=[],
                  monitor=None,
-                 data_converter = None,
                  ):
         
         super().__init__()
         self.encoder = instantiate_from_config(encoder)
         self.decoder = instantiate_from_config(decoder)
 
-        # Latent shape will convert the flat z into a tensor
-        """if 'latent_reshape' in encoder.params:
-            self.latent_reshape = encoder.params.latent_reshape
-        else:
-            self.latent_reshape = (2, encoder.params.dim_z, 1)"""
-
         self.quant_conv = torch.nn.Conv2d(2*self.encoder.dim_z, 2*self.encoder.dim_z, 1)
         self.post_quant_conv = torch.nn.Conv2d(self.encoder.dim_z, self.encoder.dim_z, 1)
 
-        if data_converter is not None:
-            self.data_converter = instantiate_from_config(data_converter)
-    
         self.loss = instantiate_from_config(lossconfig)
-        
         
         self.pretrained = ckpt_path is not None
         self.quantize = None
@@ -534,23 +525,21 @@ class IPVAE(pl.LightningModule):
 
 
     def forward(self, input, sample_posterior=True):
-        coord = input[0]
+
         posterior = self.encode(input)
         if sample_posterior:
             z = posterior.sample()
         else:
             z = posterior.mode()
-        
-        dec = self.decode(z, coord=coord)
+
+        dec = self.decode(z)
 
         return dec, posterior
 
     def encode(self, x):
         #split x into coordinates and features
-        coordinates, features = x
 
-        features = features.permute(0,2,1).reshape([features.shape[0], 1, 32, 32, 32])
-        h = self.encoder(features).contiguous()
+        h = self.encoder(x).contiguous()
 
         # Output of the encoder os (bs, latent_dim)
         # Convert latent to image of shape (latent_shape)
@@ -568,49 +557,32 @@ class IPVAE(pl.LightningModule):
         # also go through quantization layer
         quant = self.post_quant_conv(h).contiguous()
         
-        coord = coord[[0]] if coord != None else None
-        dec = self.decoder(data=quant, coord=coord)
+        dec = self.decoder(quant, coord=coord)
 
         return dec
-
-    def apply_data_converter(self, x):
-        if hasattr(self, "data_converter"):
-            x = self.data_converter.batch_to_coordinates_and_features(x)
-        return x
     
-    def apply_data_deconverter(self, features):
-        if hasattr(self, "data_converter"):
-            features = features = .5 * (features + 1.)
-        return features
-
     def training_step(self, batch, batch_idx):
 
         inputs = self.get_input(batch)
-        coordinates, features = self.apply_data_converter(inputs)
-        logits, posterior = self((coordinates, features))
+        logits, posterior = self(inputs)
         logits = logits.reshape(*inputs.shape)
 
-        # if optimizer_idx == 0:
-            # train encoder+decoder+logvar
-            
         total_loss, log_dict_ae = self.loss(inputs, logits, posterior, weights=None, split = 'train')
-        self.log("total_loss", total_loss, prog_bar=True, logger=True, on_step=True, on_epoch=True)
-        self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False)
+        self.log("train/total_loss", total_loss, prog_bar=True, logger=True, on_step=True, on_epoch=False, sync_dist=True)
+        self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=True, on_epoch=False, sync_dist=True)
         return total_loss
 
 
     def validation_step(self, batch, batch_idx):
 
         inputs = self.get_input(batch)
-        coordinates, features = self.apply_data_converter(inputs)
-        
-        logits, posterior = self((coordinates, features))
+
+        logits, posterior = self(inputs)
         logits = logits.reshape(*inputs.shape)
         total_loss, log_dict_ae = self.loss(inputs, logits, posterior, weights=None, split = 'val')
         
-        self.log("val/total_loss", log_dict_ae["val/total_loss"])
-        self.log_dict(log_dict_ae)
-        return self.log_dict
+        self.log("val/total_loss", total_loss, prog_bar=True, logger=True, on_step=False, on_epoch=True, sync_dist=True)
+        self.log_dict(log_dict_ae, prog_bar=False, logger=True, on_step=False, on_epoch=True, sync_dist=True)
     
     def get_input(self, batch):
         x = batch[0]
@@ -633,12 +605,11 @@ class IPVAE(pl.LightningModule):
         # coordinates, features = batch
         inputs = self.get_input(batch)
         if not only_inputs:
-            coords, features = self.apply_data_converter(inputs)
-            xrec, posterior = self((coords, features), sample_posterior=False)
+            xrec, posterior = self(inputs, sample_posterior=False)
             xrec = torch.sigmoid(xrec)
             xrec = xrec.reshape(*inputs.shape).cpu()
 
-            samples = torch.sigmoid(self.decode(torch.randn_like(posterior.sample()), coords))
+            samples = torch.sigmoid(self.decode(torch.randn_like(posterior.sample())))
             samples = samples.reshape(*inputs.shape).cpu()
 
             log["samples"] = samples
@@ -646,10 +617,7 @@ class IPVAE(pl.LightningModule):
 
             if super_reconstruction:
                 resolution = [64,64,64]
-                coords = self.data_converter.superresolve_coordinates(resolution).to(self.device)
-
-                # Repeat for batch_size
-                coords = coords.unsqueeze(0).repeat([xrec.shape[0], 1, 1])
+                coords = make_coord_grid(resolution, (-1, 1)).to(self.device)
                 xrec_super = torch.sigmoid(self.decode(posterior.mode(), coords)).reshape([xrec.shape[0], 1, *resolution])
                 log["super_reconstructions"] = xrec_super
 

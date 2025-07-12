@@ -15,37 +15,31 @@ model:
     unet_config:
       target: ldm.modules.diffusionmodules.openaimodel.UNetModel
       params:
-        image_size: 4              # spatial size of latent input
-        in_channels: 64            # matches latent channel dim
-        out_channels: 64           # same as in_channels
+        image_size: 8              # spatial size of latent input
+        in_channels: 32            # matches latent channel dim
+        out_channels: 32           # same as in_channels
         model_channels: 128        # base hidden dim in UNet
-        attention_resolutions: [1] # attention at 4x4
+        attention_resolutions: [1] # attention at 8x8
         num_res_blocks: 2
         channel_mult:
-        - 1   # 4x4
-        - 2   # 2x2
+        - 1   # 8x8
+        - 2   # 4x4
         num_head_channels: 64      # size of each attention head
     first_stage_config:
       target: ldm.models.autoencoder.IPVAE
       params:
         monitor: "val/rec_loss"
-        ckpt_path: /dtu/p1/ipeaz/logs/LDMI/2025-03-31T21-12-11_chairs_conv3d_siren/checkpoints/last.ckpt
+        ckpt_path: /dtu/p1/ipeaz/logs/LDMI/2025-07-12T08-40-05_chairs_ivae/checkpoints/last.ckpt
         lossconfig:
           target:  ldm.modules.losses.occupancy_loss.BernoulliLoss
           params:
-            kl_weight: 1.0e-6
+            kl_weight: 1.0e-4
         encoder:
           target: ldm.modules.encoders.conv3d_encoder.Conv3DEncoder
           params:
-            dim_z: 64
-            base_channels: 32
-            dropout: 0.2
-
-        data_converter:
-          target:  ldm.data.data_converters.conversion.GridDataConverter
-          params:
-            data_shape: [1,32,32,32]
-            normalize_features: True
+            dim_z: 32
+            base_channels: 64
+            dropout: 0.1
 
         decoder:
           target: ldm.modules.decoders.trans_inr.TransInr
@@ -55,11 +49,11 @@ model:
             tokenizer:
               target: ldm.modules.decoders.tokenizers.latent_tokenizer.LatentTokenizer
               params:                 # z is (latent_dim, latent_size, latent_size)
-                latent_dim: 64        # latent depth is doubled in post_quant_conv
-                latent_size: [4,4]    # 16 sized latent tensor  
+                latent_dim: 32        # latent depth is doubled in post_quant_conv
+                latent_size: [8,8]    # 16 sized latent tensor  
                 patch_size: 1         # Produces 64 tokens (8x8 grid)
                 n_head: 4             # 4 attention heads for better feature mixing
-                head_dim: 32          # 32 per-head embedding size
+                head_dim: 48     # ↑ from 32 → higher expressiveness
 
             inr:
               target: ldm.modules.decoders.inrs.siren.SIREN
@@ -67,19 +61,21 @@ model:
                 in_dim: 3
                 out_dim: 1 
                 out_bias: 0.5
-                depth: 5 
-                hidden_dim: 256
+                depth: 3
+                hidden_dim: 128     # ↓ from 128 → faster convergence & fewer params
+
             n_groups: 64   # in Trans-INR CelebA: 64
+
             transformer:
               target: ldm.modules.decoders.transformer.Transformer
               params:
-                dim: 128
-                encoder_depth: 3
-                decoder_depth: 3
+                dim: 64
                 n_head: 4
-                head_dim: 32
-                ff_dim: 512
-                dropout: 0.2
+                head_dim: 16
+                ff_dim: 128
+                encoder_depth: 4
+                decoder_depth: 4
+                dropout: 0.1
 
 
     cond_stage_config: __is_unconditional__

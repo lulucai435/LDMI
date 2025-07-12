@@ -17,6 +17,9 @@ class GaussianLoss(nn.Module):
         
         rec_loss = torch.abs(inputs.contiguous() - reconstructions.contiguous())
 
+        mse = ((inputs - reconstructions) ** 2).view(inputs.shape[0], -1).mean(dim=1)
+        psnr = 10 * torch.log10(1.0 / (mse + 1e-8))
+
         nll_loss = rec_loss / torch.exp(self.logvar) + self.logvar
         weighted_nll_loss = nll_loss
         weighted_nll_loss = torch.sum(weighted_nll_loss) / weighted_nll_loss.shape[0]
@@ -29,6 +32,8 @@ class GaussianLoss(nn.Module):
         log = {"{}/total_loss".format(split): loss.clone().detach().mean(), "{}/logvar".format(split): self.logvar.detach(),
                 "{}/kl_loss".format(split): kl_loss.detach().mean(), "{}/nll_loss".format(split): nll_loss.detach().mean(),
                 "{}/rec_loss".format(split): rec_loss.detach().mean(),
+                "{}/mse".format(split): mse.detach().mean(),
+                "{}/psnr".format(split): psnr.detach().mean(),
                 }
         return loss, log
 

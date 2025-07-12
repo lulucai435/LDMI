@@ -40,7 +40,8 @@ class ImageMetrics:
         block_idx = InceptionV3.BLOCK_INDEX_BY_DIM[dims]
         inception_model = InceptionV3([block_idx]).to(device)
 
-        save_path = f'/zhome/d8/1/207127/LDMI_pre/experiments/results/{self.save_name}_metrics.csv'
+        save_path = f'experiments/results/{self.save_name}_metrics.csv'
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
         # Initialize tqdm with dynamic metric tracking
         progress_bar = tqdm(enumerate(dataloader), total=len(dataloader), desc="Computing Metrics")

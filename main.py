@@ -113,7 +113,7 @@ def get_parser(**parser_kwargs):
         "-p",
         "--project",
         type=str,
-        default="LDMI_pre",
+        default="LDMI",
         help="name of new or path to existing project"
     )
     parser.add_argument(
@@ -657,7 +657,7 @@ class VoxelLogger(ImageLogger):
             pl_module.eval()
              
         with torch.no_grad():
-            images = pl_module.log_images(batch, split=split, only_inputs=False, N=self.max_images, super_resolution=True, **self.log_images_kwargs)
+            images = pl_module.log_images(batch, split=split, only_inputs=False, N=self.max_images, **self.log_images_kwargs)
             
             for key in images:
                 N = min(images[key].shape[0], self.max_images)
@@ -876,7 +876,7 @@ if __name__ == "__main__":
             "params": {
                 "dirpath": ckptdir,
                 "filename": "{epoch:06}",
-                "verbose": True,
+                "verbose": False,
                 "save_last": True,
             }
         }

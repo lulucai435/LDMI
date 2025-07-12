@@ -33,7 +33,7 @@ The easiest way to use our code is by creating a [conda](https://conda.io/) envi
 
 ```
 conda env create -f environment.yaml
-conda activate ldm
+conda activate ldmi
 ```
 
 If you experienced issues with the transformers or the torchmetric packages, we recommend you to force this pip installation after creating the env:

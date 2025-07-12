@@ -48,7 +48,6 @@ def main():
 
     # Run the experiment
     print("Running experiment...")
-    trainer = None  # Assuming trainer is not needed, modify if necessary
     experiment.run(model, data, logdir)
 
     print("Experiment completed successfully.")

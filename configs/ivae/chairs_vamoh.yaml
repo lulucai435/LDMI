@@ -16,9 +16,9 @@ model:
         dropout: 0.1
 
     decoder:
-      target: ldm.modules.decoders.trans_inr.TransInr
+      target: ldm.modules.decoders.hyper_mlp.HyperMLP
       params:
-        data_shape: [32,32,32]
+        data_shape: [32, 32, 32]
         update_strategy: scale
         tokenizer:
           target: ldm.modules.decoders.tokenizers.latent_tokenizer.LatentTokenizer
@@ -30,26 +30,23 @@ model:
             head_dim: 48     # ↑ from 32 → higher expressiveness
 
         inr:
-          target: ldm.modules.decoders.inrs.siren.SIREN
+          target: ldm.modules.decoders.inrs.inr_mlp.InrMlp
           params:
             in_dim: 3
             out_dim: 1 
             out_bias: 0.5
             depth: 3
-            hidden_dim: 128     # ↓ from 128 → faster convergence & fewer params
+            hidden_dim: 128
+            use_pe: true
+            pe_dim: 128
 
-        n_groups: 64   # in Trans-INR CelebA: 64
-
-        transformer:
-          target: ldm.modules.decoders.transformer.Transformer
+        n_groups: 128  # Using the same as original
+        mlp:
+          target: ldm.modules.decoders.mlp.MLP
           params:
-            dim: 64
-            n_head: 4
-            head_dim: 16
-            ff_dim: 128
-            encoder_depth: 4
-            decoder_depth: 4
-            dropout: 0.1
+            hidden_dims: [128, 256, 512]
+            dropout: 0.1  # Same as original
+            activation: 'gelu'
 
 
 data:

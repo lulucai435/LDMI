@@ -11,6 +11,7 @@ experiments/image_metrics.py
 experiments/inception.py
 experiments/multiple_resolutions.py
 experiments/multiple_resolutions_chairs.py
+experiments/psnr.py
 experiments/render_chairs.py
 experiments/voxel_logger_experiment.py
 latent_diffusion.egg-info/PKG-INFO

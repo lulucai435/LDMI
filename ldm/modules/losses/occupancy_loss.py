@@ -12,6 +12,15 @@ class BernoulliLoss(nn.Module):
         # inputs are binary and expressed as in {0,1}
         nll_loss = self.bce(logits, inputs)
         rec_loss = torch.abs(inputs.contiguous() - torch.sigmoid(logits).contiguous())
+        
+        #mse = (rec_loss ** 2).view(rec_loss.shape[0], -1).mean(dim=1)
+        # Binary Predictions
+        pred = torch.round(torch.sigmoid(logits))
+        mse = ((inputs - pred) ** 2).view(inputs.shape[0], -1).mean(dim=1)
+        psnr = 10 * torch.log10(1.0 / (mse + 1e-8))
+
+        # accuracy
+        accuracy = (pred == inputs).float().view(pred.shape[0], -1).mean(dim=1)
 
         if weights is not None:
             nll_loss = weights * nll_loss
@@ -24,8 +33,11 @@ class BernoulliLoss(nn.Module):
 
         loss = nll_loss + self.kl_weight * kl_loss 
 
-        log = {"{}/total_loss".format(split): loss.clone().detach().mean(),
-                "{}/kl_loss".format(split): kl_loss.detach().mean(), "{}/nll_loss".format(split): nll_loss.detach().mean(),
+        log = {"{}/kl_loss".format(split): kl_loss.detach().mean(), 
+               "{}/nll_loss".format(split): nll_loss.detach().mean(),
                 "{}/rec_loss".format(split): rec_loss.detach().mean(),
+                "{}/mse".format(split): mse.detach().mean(),
+                "{}/psnr".format(split): psnr.detach().mean(),
+                "{}/accuracy".format(split): accuracy.detach().mean(),
                 }
         return loss, log

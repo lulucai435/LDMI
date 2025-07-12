@@ -1,2 +1,0 @@
-from .plots import plot_voxels_batch_new
-from .plots_globe import globe_plot_from_data_batch
