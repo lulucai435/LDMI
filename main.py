@@ -7,19 +7,19 @@ import torch
 #############################
 #torch.set_float32_matmul_precision('high')
 import torchvision
-import pytorch_lightning as pl
+import lightning.pytorch as pl 
 
 from packaging import version
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader, Dataset
 from functools import partial
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont
 
-from pytorch_lightning import seed_everything
-from pytorch_lightning.trainer import Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
-from lightning_utilities.core.rank_zero import rank_zero_only
-from pytorch_lightning.utilities import rank_zero_info
+
+from lightning.pytorch import seed_everything
+from lightning.pytorch.trainer import Trainer
+from lightning.pytorch.callbacks import ModelCheckpoint, Callback, LearningRateMonitor
+from lightning.pytorch.utilities.rank_zero import rank_zero_only, rank_zero_info
 
 from ldm.data.base import Txt2ImgIterableBaseDataset
 from ldm.util import instantiate_from_config
@@ -28,10 +28,10 @@ import wandb
 from torchvision.utils import save_image
 
 # Uncomment this and install mcubes and pytorch3d if you train on Chairs
-#from utils.viz.render import *
+from utils.viz.render import *
 
 # Uncomment this and train cartopy if you train on ERA5
-#from utils.viz.plots_globe import *
+from utils.viz.plots_globe import *
 
 
 # Get root_dir from env var $LOGDIR
@@ -434,24 +434,33 @@ class ImageLogger(Callback):
             pl_module.logger.experiment.add_image(f"{split}/{k}", grid, global_step)    
                                        
     @rank_zero_only
-    def log_local(self, save_dir, split, images,
+    def log_local(self, pl_module, save_dir, split, images,
                   global_step, current_epoch, batch_idx):
-        root = os.path.join(save_dir, "images", split)
-        for k in images:
+        # root = os.path.join(save_dir, "images", split)
+        root = os.path.join(pl_module.logger.log_dir, 'images', split)
+        image_rows = []
+        for k in sorted(images.keys()):
             grid = torchvision.utils.make_grid(images[k], nrow=self.cols, pad_value=1)
             if self.rescale:
                 grid = (grid + 1.0) / 2.0  # -1,1 -> 0,1; c,h,w
             grid = grid.transpose(0, 1).transpose(1, 2).squeeze(-1)
             grid = grid.numpy()
             grid = (grid * 255).astype(np.uint8)
-            filename = "{}_gs-{:06}_e-{:06}_b-{:06}.png".format(
-                k,
-                global_step,
-                current_epoch,
-                batch_idx)
-            path = os.path.join(root, filename)
-            os.makedirs(os.path.split(path)[0], exist_ok=True)
-            Image.fromarray(grid).save(path)
+            pil_image = Image.fromarray(grid)
+            draw = ImageDraw.Draw(pil_image)
+            try:
+                font = ImageFont.truetype("arial.ttf", 24)
+            except:
+                font = ImageFont.load_default()
+            draw.text((10, 10), k, font=font, fill=(255, 0, 0))  # 红色文字水印
+            image_rows.append(np.array(pil_image))
+        full_image = np.concatenate(image_rows, axis=0)
+        filename = "gs-{:06}_e-{:06}_b-{:06}.png".format(
+            global_step, current_epoch, batch_idx
+        )
+        path = os.path.join(root, filename)
+        os.makedirs(os.path.split(path)[0], exist_ok=True)
+        Image.fromarray(full_image).save(path)
 
     def log_img(self, pl_module, batch, batch_idx, split="train"):
         check_idx = batch_idx if self.log_on_batch_idx else pl_module.global_step
@@ -476,7 +485,7 @@ class ImageLogger(Callback):
                     if self.clamp:
                         images[k] = torch.clamp(images[k], -1., 1.)
 
-            self.log_local(pl_module.logger.save_dir, split, images,
+            self.log_local(pl_module, pl_module.logger.save_dir, split, images,
                            pl_module.global_step, pl_module.current_epoch, batch_idx)
 
             logger_log_images = self.logger_log_images.get(logger, lambda *args, **kwargs: None)
@@ -500,7 +509,7 @@ class ImageLogger(Callback):
         if not self.disabled and (pl_module.global_step > 0 or self.log_first_step):
             self.log_img(pl_module, batch, batch_idx, split="train")
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None):
         if not self.disabled and pl_module.global_step > 0:
             self.log_img(pl_module, batch, batch_idx, split="val")
         if hasattr(pl_module, 'calibrate_grad_norm'):
@@ -531,8 +540,8 @@ class ERA5Logger(Callback):
     @rank_zero_only
     def log_local(self, save_dir, split, images, latitude, longitude,
                   global_step, current_epoch, batch_idx):
-
-        root = os.path.join(save_dir, "images", split)
+        # root = os.path.join(save_dir, "images", split)
+        root = os.path.join(pl_module.logger.log_dir, 'images', split)
         for k in images:
             filename = "{}_gs-{:06}_e-{:06}_b-{:06}.png".format(
                 k,
@@ -592,7 +601,7 @@ class ERA5Logger(Callback):
         if not self.disabled and (pl_module.global_step > 0 or self.log_first_step):
             self.log_img(pl_module, batch, batch_idx, split="train")
 
-    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx):
+    def on_validation_batch_end(self, trainer, pl_module, outputs, batch, batch_idx, dataloader_idx=None):
         if not self.disabled and pl_module.global_step > 0:
             self.log_img(pl_module, batch, batch_idx, split="val")
         if hasattr(pl_module, 'calibrate_grad_norm'):
@@ -650,8 +659,8 @@ class VoxelLogger(ImageLogger):
             if is_train:
                 pl_module.eval()
         
-        root = os.path.join(pl_module.logger.save_dir, 'images', split)
-        
+        # root = os.path.join(pl_module.logger.save_dir, 'images', split)
+        root = os.path.join(pl_module.logger.log_dir, 'images', split)
         is_train = pl_module.training
         if is_train:
             pl_module.eval()

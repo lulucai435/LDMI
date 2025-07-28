@@ -6,7 +6,7 @@ from einops import repeat
 from taming.modules.discriminator.model import NLayerDiscriminator, weights_init
 from taming.modules.losses.lpips import LPIPS
 from taming.modules.losses.vqperceptual import hinge_d_loss, vanilla_d_loss
-
+from pdb import set_trace as bb
 
 
 
@@ -103,6 +103,10 @@ class VQLPIPSWithDiscriminator(nn.Module):
             codebook_loss = torch.tensor([0.]).to(inputs.device)
         #rec_loss = torch.abs(inputs.contiguous() - reconstructions.contiguous())
         rec_loss = self.pixel_loss(inputs.contiguous(), reconstructions.contiguous())
+        recon_clamp = torch.clamp(reconstructions.contiguous(), -1, 1)
+        mse_loss = F.mse_loss(inputs.contiguous(), recon_clamp, reduction='none')
+        psnr = 10 * torch.log10(4.0 / (mse_loss + 1e-8))
+        # bb()
         if self.perceptual_weight > 0:
             p_loss = self.perceptual_loss(inputs.contiguous(), reconstructions.contiguous())
             rec_loss = rec_loss + self.perceptual_weight * p_loss
@@ -138,9 +142,10 @@ class VQLPIPSWithDiscriminator(nn.Module):
                    "{}/nll_loss".format(split): nll_loss.detach().mean(),
                    "{}/rec_loss".format(split): rec_loss.detach().mean(),
                    "{}/p_loss".format(split): p_loss.detach().mean(),
-                   "{}/d_weight".format(split): d_weight.detach(),
-                   "{}/disc_factor".format(split): torch.tensor(disc_factor),
+                   "{}/d_weight".format(split): d_weight.detach().to(inputs.device),
+                   "{}/disc_factor".format(split): torch.tensor(disc_factor).to(inputs.device),
                    "{}/g_loss".format(split): g_loss.detach().mean(),
+                   "{}/psnr".format(split): psnr.detach().mean(),
                    }
             if predicted_indices is not None:
                 assert self.n_classes is not None

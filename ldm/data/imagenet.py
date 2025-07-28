@@ -17,7 +17,7 @@ from torch.utils.data import Dataset, Subset
 import taming.data.utils as tdu
 from taming.data.imagenet import str_to_indices, give_synsets_from_indices, download, retrieve
 from taming.data.imagenet import ImagePaths
-
+from pdb import set_trace as bb
 #from ldm.modules.image_degradation import degradation_fn_bsr, degradation_fn_bsr_light
 
 
@@ -136,7 +136,7 @@ class ImageNetBase(Dataset):
 
 
 class ImageNetTrain(ImageNetBase):
-    NAME = "ILSVRC2012_train"
+    NAME = "train"
     URL = "http://www.image-net.org/challenges/LSVRC/2012/"
     AT_HASH = "a306397ccf9c2ead27155983c254227c0fd938e2"
     FILES = [
@@ -158,7 +158,7 @@ class ImageNetTrain(ImageNetBase):
             cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
             self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
 
-        self.datadir = os.path.join(self.root, "data")
+        self.datadir = os.path.join(self.root)
         self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 1281167
         self.random_crop = retrieve(self.config, "ImageNetTrain/random_crop",
@@ -199,7 +199,7 @@ class ImageNetTrain(ImageNetBase):
 
 
 class ImageNetValidation(ImageNetBase):
-    NAME = "ILSVRC2012_validation"
+    NAME = "validation"
     URL = "http://www.image-net.org/challenges/LSVRC/2012/"
     AT_HASH = "5d6d0df7ed81efd49ca99ea4737e0ae5e3a5f2e5"
     VS_URL = "https://heibox.uni-heidelberg.de/f/3e0f6e9c624e45f2bd73/?dl=1"
@@ -223,7 +223,7 @@ class ImageNetValidation(ImageNetBase):
         else:
             cachedir = os.environ.get("XDG_CACHE_HOME", os.path.expanduser("~/.cache"))
             self.root = os.path.join(cachedir, "autoencoders/data", self.NAME)
-        self.datadir = os.path.join(self.root, "data")
+        self.datadir = os.path.join(self.root)
         self.txt_filelist = os.path.join(self.root, "filelist.txt")
         self.expected_length = 50000
         self.random_crop = retrieve(self.config, "ImageNetValidation/random_crop",
